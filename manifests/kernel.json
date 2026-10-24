@@ -5,6 +5,5 @@
   "upstream_commit": "c03c1a14507dfaf8b856c2608f9ac216021fc222",
   "commit": "14658d97220a06e34976d703e167073462390c78",
   "archive": "linux-7.3.0-sy108-14658d97220a.tar.gz",
-  "version": "7.3.0",
-  "sha256": "41352bb0e5fd3aac1cf7b50da0c08c2f7527da03760d3dde440f688d4e82b62a"
+  "version": "7.3.0"
 }
