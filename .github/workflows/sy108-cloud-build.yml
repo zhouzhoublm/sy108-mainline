@@ -1,0 +1,118 @@
+name: SY108 cloud build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Build profile"
+        type: choice
+        options:
+          - main
+          - recovery
+          - both
+        default: main
+        required: true
+      jobs:
+        description: "Parallel build jobs (keep low on hosted runners)"
+        type: choice
+        options:
+          - "2"
+          - "3"
+          - "4"
+        default: "2"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sy108-cloud-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      SY108_JOBS: ${{ inputs.jobs }}
+      SY108_MEMORY: 6g
+      SY108_OUT: ${{ github.workspace }}/out
+      SY108_DOWNLOADS: ${{ github.workspace }}/out/downloads
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU for ARM64 containers
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore download and ccache caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            out/downloads
+            out/ccache
+          key: sy108-${{ runner.os }}-${{ hashFiles('manifests/*.json', 'integration/openwrt/series') }}-${{ github.run_id }}
+          restore-keys: |
+            sy108-${{ runner.os }}-${{ hashFiles('manifests/*.json', 'integration/openwrt/series') }}-
+            sy108-${{ runner.os }}-
+
+      - name: Bootstrap pinned OpenWrt and kernel sources
+        run: python3 tools/bootstrap.py
+
+      - name: Build selected profile(s)
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ inputs.profile }}" in
+            main)
+              python3 tools/build/firmware.py main --jobs "${SY108_JOBS}"
+              ;;
+            recovery)
+              python3 tools/build/firmware.py recovery --jobs "${SY108_JOBS}"
+              ;;
+            both)
+              # The profiles share one OpenWrt build tree and must be built serially.
+              python3 tools/build/firmware.py main --jobs "${SY108_JOBS}"
+              python3 tools/build/firmware.py recovery --jobs "${SY108_JOBS}"
+              ;;
+          esac
+
+      - name: Record source and output checksums
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p out/reports
+          git rev-parse HEAD > out/reports/integration-commit.txt
+          if [ -d out/images ]; then
+            find out/images -type f -print0 | sort -z | xargs -0 -r sha256sum > out/reports/SHA256SUMS.txt
+          fi
+          {
+            echo "Workflow: ${GITHUB_WORKFLOW}"
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "Commit: ${GITHUB_SHA}"
+            echo "Requested profile: ${{ inputs.profile }}"
+          } > out/reports/build-report.txt
+
+      - name: Upload firmware and build reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sy108-${{ inputs.profile }}-${{ github.run_number }}
+          path: |
+            out/images/**
+            out/reports/**
+          if-no-files-found: warn
+          compression-level: 1
+          retention-days: 14
