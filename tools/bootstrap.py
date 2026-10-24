@@ -33,7 +33,7 @@ def main():
     kernel = json.loads((PROJECT / 'manifests/kernel.json').read_text())
     linux_url = a.linux_url or kernel.get('repo')
     if not LINUX.exists() and not linux_url:
-        p.error('Provide --linux-url or set SY108_LINUX to the Linux checkout')
+        p.error('Provide --linux-url or set SY108_LINUX to a Linux checkout')
     checkout(linux_url, kernel['commit'], LINUX)
     subprocess.run([sys.executable, str(PROJECT / 'tools/build/kernel-source.py')], check=True)
     lock = json.loads((PROJECT / 'manifests/openwrt.json').read_text())
@@ -41,11 +41,11 @@ def main():
     digest = hashlib.sha256()
     for path in sorted(integration.rglob('*')):
         if path.is_file():
-            digest.update(str(path.relative_to(integration)).encode() + b'\0' + path.read_bytes())
+            digest.update(str(path.relative_to(integration)).encode() + b'\\0' + path.read_bytes())
     if not a.skip_container:
         subprocess.run(
             docker() + [
-                'build', '--platform', 'linux/arm64', '-t', IMAGE,
+                'build', '--platform', 'linux/amd64', '-t', IMAGE,
                 '-f', str(PROJECT / 'containers/Dockerfile'), str(PROJECT / 'containers'),
             ],
             check=True,
@@ -67,7 +67,7 @@ def main():
         if not applied:
             subprocess.run(['git', '-C', str(tree), 'apply', str(patch)], check=True)
     shutil.copytree(integration / 'target/linux/sprd', tree / 'target/linux/sprd', dirs_exist_ok=True)
-    (tree / 'feeds.conf').write_text((integration / 'feeds.conf').read_text() + '\nsrc-link sy108 /project/packages\n')
+    (tree / 'feeds.conf').write_text((integration / 'feeds.conf').read_text() + '\\nsrc-link sy108 /project/packages\\n')
     subprocess.run([sys.executable, str(PROJECT / 'tools/build/kernel-source.py')], check=True)
     run(['sh', '-c', 'test -e dl || ln -s /downloads dl; ./scripts/feeds update -a'])
     run(['./scripts/feeds', 'install', '-a'])
@@ -76,7 +76,7 @@ def main():
         'integration_sha256': digest.hexdigest(),
         'kernel_commit': kernel['commit'],
     }
-    (tree / '.sy108-integration.json').write_text(json.dumps(expected, indent=2) + '\n')
+    (tree / '.sy108-integration.json').write_text(json.dumps(expected, indent=2) + '\\n')
     print('Prepared fixed sources and feeds.')
 
 
