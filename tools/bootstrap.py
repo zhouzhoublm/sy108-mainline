@@ -33,7 +33,7 @@ def main():
     kernel = json.loads((PROJECT / 'manifests/kernel.json').read_text())
     linux_url = a.linux_url or kernel.get('repo')
     if not LINUX.exists() and not linux_url:
-        p.error('Provide --linux-url or set SY108_LINUX to the Linux checkout')
+        p.error('Provide --linux-url or set SY108_LINUX to a Linux checkout')
     checkout(linux_url, kernel['commit'], LINUX)
     subprocess.run([sys.executable, str(PROJECT / 'tools/build/kernel-source.py')], check=True)
     lock = json.loads((PROJECT / 'manifests/openwrt.json').read_text())
@@ -45,7 +45,7 @@ def main():
     if not a.skip_container:
         subprocess.run(
             docker() + [
-                'build', '--platform', 'linux/arm64', '-t', IMAGE,
+                'build', '--platform', 'linux/amd64', '-t', IMAGE,
                 '-f', str(PROJECT / 'containers/Dockerfile'), str(PROJECT / 'containers'),
             ],
             check=True,

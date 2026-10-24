@@ -44,14 +44,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up QEMU for ARM64 containers
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
+      # The host is x86_64; OpenWrt cross-compiles the target to AArch64.
+      # Build and run the generic Debian tool container natively to avoid QEMU
+      # emulation overhead during the GCC/toolchain build.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
